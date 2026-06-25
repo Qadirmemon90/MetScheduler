@@ -15,12 +15,11 @@ const Sidebar = ({
   isOpen: boolean;
   setIsOpen: (val: boolean) => void;
 }) => {
-  const { logout, user } = {
-    logout: () => {
-      window.location.href = "/";
-    },
-    user: { name: "John Doe", email: "johndoe@example.com" },
+  const logout = () => {
+    window.location.href = "/";
   };
+
+  const user = { name: "John Doe", email: "johndoe@example.com" };
 
   const location = useLocation();
 
