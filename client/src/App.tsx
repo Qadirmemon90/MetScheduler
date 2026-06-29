@@ -4,8 +4,8 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Accounts from "./pages/Accounts";
 import AIComposer from "./pages/AIComposer";
-import Scheduler from "./pages/Scheduler";
 import Layout from "./components/Layout";
+import Scheduler from "./pages/Scheduler";
 
 export default function App() {
   return (
@@ -17,7 +17,7 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/accounts" element={<Accounts />} />
         <Route path="/ai-composer" element={<AIComposer />} />
-        <Route path="/schedule" element={<Scheduler />} />
+        <Route path="/schedule" element={<Scheduler/>}/>   
       </Route>
     </Routes>
   );
