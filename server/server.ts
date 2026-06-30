@@ -7,6 +7,10 @@ import authRouter from "./routes/AuthRoutes.js";
 import socialAuthRouter from "./routes/socialAuthRouter.js";
 import accountRouter from "./routes/accountRouts.js";
 import postRouter from "./routes/postRoutes.js";
+import activityRouter from "./routes/activityRoutes.js";
+import { initScheduler } from "./services/schedulerService.js";
+
+
 
 
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
@@ -25,7 +29,10 @@ app.use("/api/auth", authRouter)
 app.use("/api/oauth", socialAuthRouter)
 app.use("/api/accounts", accountRouter)
 app.use("/api/posts", postRouter)
+app.use("/api/activity", activityRouter)
 
+//Initialize Scheduler
+initScheduler()
 
 // Global Error Handler
 
