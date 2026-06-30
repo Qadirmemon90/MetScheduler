@@ -5,6 +5,8 @@ import cors from "cors";
 import connectDB from "./config/db.js";
 import authRouter from "./routes/AuthRoutes.js";
 import socialAuthRouter from "./routes/socialAuthRouter.js";
+import accountRouter from "./routes/accountRouts.js";
+import postRouter from "./routes/postRoutes.js";
 
 
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
@@ -21,6 +23,8 @@ app.get("/", (_req: Request, res: Response) => {
 
 app.use("/api/auth", authRouter)
 app.use("/api/oauth", socialAuthRouter)
+app.use("/api/accounts", accountRouter)
+app.use("/api/posts", postRouter)
 
 
 // Global Error Handler
