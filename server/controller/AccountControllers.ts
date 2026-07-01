@@ -27,13 +27,14 @@ export const addAccount = async (
   try {
     const { platform, handle, avatarUrl } = req.body;
 
-    const accounts = await Account.find({
+    const account = await Account.create({
       user: req.user._id,
       platform,
       handle,
       avatarUrl,
+      status: "connected",
     });
-    res.json(201).json(accounts);
+    res.status(201).json(account);
   } catch (error: any) {
     res.status(500).json({ message: error?.message || "Server error" });
   }

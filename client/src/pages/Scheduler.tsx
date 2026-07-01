@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 
-import { dummyPostsData, PLATFORMS } from "../assets/assets";
+import { PLATFORMS } from "../assets/assets";
 import {
+  AlertCircleIcon,
   ArrowRightIcon,
   CalendarDaysIcon,
   CalendarIcon,
@@ -11,6 +12,8 @@ import {
   SendIcon,
   XIcon,
 } from "lucide-react";
+import api from "../api/axios";
+import toast from "react-hot-toast";
 
 const Scheduler = () => {
   const [posts, setPosts] = useState<any[]>([]);
@@ -22,17 +25,22 @@ const Scheduler = () => {
   const [loading, setLoading] = useState(false);
 
   const fetchPosts = async () => {
-    // dummy state fill for now
-    setPosts(dummyPostsData);
+    try{
+      const {data} = await api.get("/api/posts");
+      setPosts(data);
+    } catch (error:any) {
+      console.error(error?.response?.data?.message || error.message);
+    }
   };
 
   useEffect(() => {
     (async () => await fetchPosts())();
-    const interval = setInterval(async () => await fetchPosts(), 1000);
+    const interval = setInterval(async () => await fetchPosts(), 10000);
     return () => clearInterval(interval);
   }, []);
   const scheduled = posts.filter((p) => p.status === "scheduled");
   const published = posts.filter((p) => p.status === "published");
+  const failed = posts.filter((p) => p.status === "failed");
 
   const togglePlatform = (id: string) =>
     setSelectedPlatforms((prev) =>
@@ -41,12 +49,42 @@ const Scheduler = () => {
 
   const handleSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    if(selectedPlatforms.length === 0) {
+      toast.error("Please select at least one platform to schedule the post.");
+      return;
+    }
+    if(!scheduledDate || !scheduledTime) {
+      toast.error("Please select a valid date and time for scheduling.");
+      return;
+    }
+    if(selectedPlatforms.includes('instagram') && !mediaFile) {
+      toast.error("Please upload a media file for Instagram posts.");
+      return;
+    }
 
-    setTimeout(() => {
+    const scheduledFor = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
+    const formData = new FormData();
+    formData.append("content", content);
+    formData.append("scheduledFor", scheduledFor);
+    formData.append("platforms", JSON.stringify(selectedPlatforms));
+    if(mediaFile) formData.append("media", mediaFile);
+
+    setLoading(true);
+    try {
+      await api.post("/api/posts", formData, {headers: {"Content-Type": "multipart/form-data",}});
+      toast.success("Post scheduled successfully!");
+      setContent("");
+      setScheduledDate("");
+      setScheduledTime("");
+      setSelectedPlatforms([]);
+      setMediaFile(null);
+      fetchPosts();
+    } catch (error:any) {
+      console.error(error?.response?.data?.message || error.message);
+      toast.error(error?.response?.data?.message || "Failed to schedule the post.");
+    } finally {
       setLoading(false);
-      setPosts((prev) => [...prev, dummyPostsData[0]]);
-    }, 1000);
+    }
   };
 
   return (
@@ -330,6 +368,53 @@ const Scheduler = () => {
             )}
           </div>
         </div>
+        {failed.length > 0 && (
+          <div className="bg-white rounded-2xl border border-red-100 overflow-hidden">
+            <div className="flex items-center gap-2.5 px-5 py-4 border-b border-red-50">
+              <AlertCircleIcon className="size-4 text-red-500" />
+              <h3 className="text-slate-900 text-sm">Failed</h3>
+              <span
+                className="ml-auto text-xs font-bold bg-red-50 text-red-700 px-2
+              py-0.5 rounded-full"
+              >
+                {failed.length}
+              </span>
+            </div>
+            <div className="max-h-72 overflow-y-auto divide-y divide-red-50">
+              {failed.map((post) => (
+                <div
+                  key={post._id}
+                  className="px-5 py-4 hover:bg-red-50/40 transition-all"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="flex gap-1.5 items-center">
+                      {post.platforms.map((pl: string) => {
+                        const meta = PLATFORMS.find((p) => p.id === pl);
+                        return meta ? (
+                          <meta.icon
+                            key={pl}
+                            className="size-3.5 text-slate-400"
+                          />
+                        ) : null;
+                      })}
+                    </div>
+                    <span className="text-xs text-slate-400 shrink-0">
+                      {new Date(post.updatedAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-500 line-clamp-2 max-w-md">
+                    {post.content}
+                  </p>
+                  {post.failureReason && (
+                    <p className="text-xs text-red-600 mt-2 line-clamp-3">
+                      {post.failureReason}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         </div>
     </div>
   );

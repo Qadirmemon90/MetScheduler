@@ -7,7 +7,8 @@ import {
   TrendingUpIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { dummyAccountsData, dummyActivityData, dummyPostsData } from "../assets/assets";
+import api from "../api/axios"
+
 
 type ActivityItem = {
   _id: string;
@@ -27,28 +28,23 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-
-        const [postsRes, accountsRes, activityRes] = [
-          { data: dummyPostsData },
-          { data: dummyAccountsData },
-          { data: dummyActivityData },
-        ];
+        const [postsRes, accountsRes, activityRes] = await Promise.all([
+          api.get("/api/posts"),
+          api.get("/api/accounts"),
+          api.get("/api/activity"),
+        ]);
 
         const posts = postsRes.data;
+        const accounts = accountsRes.data;
+        const activity = activityRes.data;
+
         setStats({
-    scheduled: posts.filter((p: { status: string }) => p.status === "scheduled")
-      .length,
-    published: posts.filter((p: { status: string }) => p.status === "published")
-      .length,
-
-          connectedAccounts: accountsRes.data.filter(
-            (a: { status: string }) => a.status === "connected"
-          ).length,
-
+          scheduled: posts.filter((p: { status: string }) => p.status === "scheduled").length,
+          published: posts.filter((p: { status: string }) => p.status === "published").length,
+          connectedAccounts: accounts.filter((a: { status: string }) => a.status === "connected").length,
         });
 
-        // Prefer activityRes if it contains activity data, otherwise fall back to accounts.
-        const activityData = activityRes?.data ?? accountsRes.data;
+        const activityData = Array.isArray(activity) ? activity : Array.isArray(accounts) ? accounts : [];
         setActivities(activityData);
       } catch (error: unknown) {
         const err = error as { message?: string };
