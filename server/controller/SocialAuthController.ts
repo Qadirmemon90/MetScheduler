@@ -1,27 +1,18 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import zernio from "../config/zernio.js";
 import { User } from "../models/user.js";
-import { platform } from "node:os";
 import { Account } from "../models/Accounts.js";
 import { AuthRequest } from "../middlewares/authMiddleware.js";
 
 //Helper to ensure user has a Zernio Profile
 const getOrCreateZernioProfile = async (user: any): Promise<string> => {
   try {
-    const result = await zernio.profiles.listProfiles();
-    const data = result.data as any;
-    const profiles: any[] = Array.isArray(data)
-      ? data
-      : data?.profiles || data?.data || [];
-
-    if (profiles.length > 0) {
-      const pid = profiles[0]._id || profiles[0].id;
-      await User.findByIdAndUpdate(user._id, { zernioProfileId: pid });
-      return pid;
+    if (user.zernioProfileId) {
+      return user.zernioProfileId;
     }
 
     const createResult = await zernio.profiles.createProfile({
-      body: { name: `${user.name || user.email}'s workspace` } as any,
+      body: { name: `${user.name || user.email} workspace` } as any,
     });
     const created = (createResult.data as any)?.profile || createResult.data;
 
@@ -90,12 +81,12 @@ export const syncAccounts = async (
 
     const data = result.data as any;
     const zernioAccounts: any[] =
-      data?.accounts || (Array.isArray(data) ? data : []);
+      data?.accounts || data?.data || (Array.isArray(data) ? data : []);
     const supportedPlatforms = [
       "linkedin",
       "facebook",
       "instagram",
-      "twitter,",
+      "twitter",
     ];
     const syncedAccounts = [];
 
@@ -121,18 +112,28 @@ export const syncAccounts = async (
       }
 
       const account = await Account.findOneAndUpdate(
-        { zernioAccountId: zid },
+        { user: req.user._id, zernioAccountId: zid },
         {
           user: req.user._id,
           platform: normalizedPlatform,
-          handle: zAccount.username || zAccount.name || zAccount.handle ||  "Unknown",
+          handle: zAccount.username || zAccount.name || zAccount.handle || "Unknown",
           zernioAccountId: zid,
           status: "connected",
-          avatarUrl: zAccount.avatarUrl || zAccount.picture || zAccount.profile_image_Url,
+          avatarUrl:
+            zAccount.avatarUrl ||
+            zAccount.picture ||
+            zAccount.profile_image_url ||
+            zAccount.profile_image_Url,
         },
-        {upset: true, returnDocment: 'after'}
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+        },
       );
-      syncedAccounts.push(account)
+      if (account) {
+        syncedAccounts.push(account);
+      }
     }
     res.json(syncedAccounts)
   } catch (error: any) {

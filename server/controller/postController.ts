@@ -5,6 +5,11 @@ import axios from "axios";
 import { cloudinary } from "../config/cloudinary.js";
 import { Generation } from "../models/Generation.js";
 import { Post } from "../models/Post.js";
+import {
+  getConnectedAccountsForPlatforms,
+  isSocialPlatform,
+  type SocialPlatform,
+} from "../services/publishService.js";
 
 const pollLeonardJob = async (  generationId: string,  apiKey: string,) : Promise<string> => {
   const maxRetries = 20;
@@ -40,7 +45,7 @@ const pollLeonardJob = async (  generationId: string,  apiKey: string,) : Promis
     }
     await new Promise((resolve)=> setTimeout(resolve, delay))
   }
- throw new Error("")
+ throw new Error("Leonardo.ai generation timed out")
 };
 
 // Generate post
@@ -79,7 +84,7 @@ export const generatePost = async (
 
     try {
       const rawText = textResponse.text || "";
-      const jsonMatch = rawText.match(/\{[s\S]*\}/);
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
       const data = jsonMatch
         ? JSON.parse(jsonMatch[0])
         : { content: rawText, imagePrompt: prompt };
@@ -179,42 +184,118 @@ export const getPosts = async ( req: AuthRequest,  res: Response,): Promise<void
 // POST /api/posts
 export const schedulePost = async ( req: AuthRequest,  res: Response,): Promise<void> => {
   try {
-    const {content, platforms, scheduledFor, status} = req.body;
+    const {content, platforms, scheduledFor} = req.body;
 
     //Parse platforrms if it comes as a stringified array from FromData
-    let parsedPLatforms = platforms;
+    let parsedPlatforms: string[] | string = platforms;
     if(typeof platforms === "string"){
         try {
-            parsedPLatforms = JSON.parse(platforms)
+            parsedPlatforms = JSON.parse(platforms)
         } catch (e) {
-            parsedPLatforms = platforms.split(",");
+            parsedPlatforms = platforms.split(",");
         }
     }
 
     let mediaUrl: string | undefined = req.body.mediaUrl;
     let mediaType: "image" | "video" | undefined = req.body.mediaType;
 
-    if(req.file){
-        const result = await new Promise<any>((resolve, reject)=>{
-            const stream = cloudinary.uploader.upload_stream({resource_type: "auto",
-                folder: "social-scheduler"}, (error, result)=>{
-                    if(error) reject(error);
-                    else resolve(result)
-                });
-                stream.end(req.file!.buffer);
+    if (!content || !content.trim()) {
+      res.status(400).json({ message: "Post content is required" });
+      return;
+    }
+
+    if (!Array.isArray(parsedPlatforms)) {
+      res.status(400).json({ message: "Platforms must be an array" });
+      return;
+    }
+
+    const normalizedPlatforms = [
+      ...new Set(
+        parsedPlatforms
+          .map((platform: string) => platform?.trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    ];
+
+    if (normalizedPlatforms.length === 0) {
+      res.status(400).json({ message: "Select at least one platform" });
+      return;
+    }
+
+    const invalidPlatforms = normalizedPlatforms.filter(
+      (platform) => !isSocialPlatform(platform),
+    );
+
+    if (invalidPlatforms.length > 0) {
+      res.status(400).json({
+        message: `Unsupported platform: ${invalidPlatforms.join(", ")}`,
+      });
+      return;
+    }
+
+    const selectedPlatforms = normalizedPlatforms as SocialPlatform[];
+
+    const scheduledDate = new Date(scheduledFor);
+    if (Number.isNaN(scheduledDate.getTime())) {
+      res.status(400).json({ message: "A valid scheduled date is required" });
+      return;
+    }
+
+    if (selectedPlatforms.includes("instagram") && !mediaUrl && !req.file) {
+      res.status(400).json({ message: "Instagram posts require media" });
+      return;
+    }
+
+    const connectedAccounts = await getConnectedAccountsForPlatforms(
+      req.user._id,
+      selectedPlatforms,
+    );
+    const connectedPlatforms = new Set(
+      connectedAccounts.map((account) => account.platform),
+    );
+    const missingPlatforms = selectedPlatforms.filter(
+      (platform) => !connectedPlatforms.has(platform),
+    );
+
+    if (missingPlatforms.length > 0) {
+      res.status(400).json({
+        message: `Connect ${missingPlatforms.join(", ")} before scheduling this post`,
+      });
+      return;
+    }
+
+    if (req.file) {
+      try {
+        const result = await new Promise<any>((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { resource_type: "auto", folder: "social-scheduler" },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            },
+          );
+          stream.end(req.file!.buffer);
         });
         mediaUrl = result.secure_url;
         mediaType = result.resource_type === "video" ? "video" : "image";
+      } catch (cloudErr: any) {
+        console.error("Cloudinary upload error:", cloudErr?.message || cloudErr);
+        // include extra details if available
+        if (cloudErr?.http_code) console.error("Cloudinary http_code:", cloudErr.http_code);
+        if (cloudErr?.error) console.error("Cloudinary error object:", cloudErr.error);
+        res.status(502).json({ message: "Failed to upload media to Cloudinary", details: cloudErr?.message || cloudErr });
+        return;
+      }
     }
 
     const post = await Post.create({
         user: req.user._id,
-        content,
-        platforms: parsedPLatforms,
+        content: content.trim(),
+        platforms: selectedPlatforms,
         mediaUrl,
         mediaType,
-        scheduledFor,
-        status,
+        scheduledFor: scheduledDate,
+        status: "scheduled",
     })
     res.status(201).json(post)
 

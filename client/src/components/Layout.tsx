@@ -1,22 +1,42 @@
 import React from "react";
 import Sidebar from "./Sidebar";
-import { Outlet, useLocation } from "react-router-dom";
-import { MenuIcon } from "lucide-react";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { MenuIcon, MoonIcon, SunIcon } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 const pageTitles: Record<string, string> = {
   "/dashboard" : "Dashboard",
   "/accounts" : "Social Accounts",
   "/schedule" : "Post Scheduler",
   "/ai-composer" : "AI Composer",
+  "/settings" : "Profile Settings",
+  "/admin" : "Admin Dashboard",
 }
 
 const Layout = () => {
+
+    const {isAuthenticated , isLoading}= useAuth();
+    const {isDark, toggleTheme} = useTheme();
 
     const location = useLocation();
 
     const title = pageTitles[location.pathname] || "SocialAI";
     
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+
+    if(isLoading){
+      return(
+        <div className="flex h-screen items-center justify-center bg-slate-50">
+           <div className="size-8 border-4 border-red-500 border-t-transparent 
+           rounded-full animate-spin"/> 
+        </div>
+      )
+    }
+
+    if(!isAuthenticated){
+      return <Navigate to="/login" replace/>
+    }
 
   return (
     <div className="flex h-screen bg-slate-50"> 
@@ -42,6 +62,14 @@ const Layout = () => {
             <h1 className="text-slate-900">{title}</h1>
             <p className="text-sm text-slate-400 hidden sm:block">Manage and automate your social presence</p>
           </div>
+
+          <button
+            onClick={toggleTheme}
+            className="ml-auto inline-flex size-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {isDark ? <SunIcon className="size-4" /> : <MoonIcon className="size-4" />}
+          </button>
 
         </header>
 

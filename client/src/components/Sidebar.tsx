@@ -2,10 +2,13 @@ import {
   CalendarDaysIcon,
   LayoutDashboardIcon,
   LogOutIcon,
+  SettingsIcon,
+  ShieldCheckIcon,
   UserIcon,
   Wand2Icon,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const Sidebar = ({
   isOpen,
@@ -14,11 +17,8 @@ const Sidebar = ({
   isOpen: boolean;
   setIsOpen: (val: boolean) => void;
 }) => {
-  const logout = () => {
-    window.location.href = "/";
-  };
+  const { logout, user } = useAuth();
 
-  const user = { name: "John Doe", email: "johndoe@example.com" };
 
   const location = useLocation();
 
@@ -27,6 +27,10 @@ const Sidebar = ({
     { name: "Accounts", icon: UserIcon, path: "/accounts" },
     { name: "Schedule", icon: CalendarDaysIcon, path: "/schedule" },
     { name: "AI-Composer", icon: Wand2Icon, path: "/ai-composer" },
+    { name: "Settings", icon: SettingsIcon, path: "/settings" },
+    ...(user?.role === "admin"
+      ? [{ name: "Admin", icon: ShieldCheckIcon, path: "/admin" }]
+      : []),
   ];
 
   return (
@@ -87,7 +91,11 @@ const Sidebar = ({
 
       {/* User Footer */}
       <div className="p-4 border-t border-slate-100">
-        <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors">
+        <NavLink
+          to="/settings"
+          onClick={() => setIsOpen(false)}
+          className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors"
+        >
           <div
             className="size-8 rounded-full bg-linear-to-br from-red-400 to-pink-400 
           flex items-center justify-center text-white text-sm font-medium shrink-0"
@@ -99,7 +107,7 @@ const Sidebar = ({
             <div className="text-sm text-slate-800 truncate">{user?.name}</div>
             <div className="text-sm text-slate-400 truncate">{user?.email}</div>
           </div>
-        </div>
+        </NavLink>
         <button
           onClick={logout}
           className="mt-1 flex items-center gap-2 px-3 py-2 w-full

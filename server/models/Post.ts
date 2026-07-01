@@ -6,6 +6,7 @@ const postSchema = new mongoose.Schema(
     content: { type: String, required: true },
     mediaUrl: { type: String },
     mediaType: { type: String, enum: ["image", "video"] },
+    failureReason: { type: String },
     platforms: [
       {
         type: String,

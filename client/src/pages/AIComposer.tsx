@@ -10,7 +10,7 @@ import {
   type ReactNode,
   type ReactPortal,
 } from "react";
-import { dummyGenerationData, PLATFORMS } from "../assets/assets";
+import { PLATFORMS } from "../assets/assets";
 import {
   ArrowRightIcon,
   CalendarIcon,
@@ -21,13 +21,15 @@ import {
   Wand2Icon,
   XIcon,
 } from "lucide-react";
+import api from "../api/axios";
+import toast from "react-hot-toast";
 
 const AIComposer = () => {
   const [prompt, setPrompt] = useState("");
   const [tone, setTone] = useState("Professional");
   const [generateImage, setGenerateImage] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [generations, setGenerations] = useState<any | null>([]);
+  const [generations, setGenerations] = useState<any[]>([]);
 
   // Scheduling state
   const [activeScheduler, setActiveScheduler] = useState<any | null>(null);
@@ -37,20 +39,81 @@ const AIComposer = () => {
   const [scheduling, setScheduling] = useState(false);
 
   const fetchGenerations = async () => {
-    setGenerations(dummyGenerationData);
+    try {
+      const { data } = await api.get("/api/posts/generations");
+      setGenerations(data);
+    } catch (error: any) {
+      console.error(error?.response?.data?.message || error.message);
+    }
   };
 
   const handleGenerate = async () => {
+    if (!prompt.trim()) {
+      toast.error("Please enter a prompt first.");
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const { data } = await api.post("/api/posts/generate", {
+        prompt,
+        tone,
+        generateImage,
+      });
+      setGenerations((prev) => [data, ...prev]);
+      setPrompt("");
+      toast.success("Post generated successfully!");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to generate post.");
+    } finally {
       setLoading(false);
-    }, 2000);
+    }
   };
+
   const handleSchedule = async () => {
+    if (!activeScheduler) return;
+
+    if (selectedPlatforms.length === 0) {
+      toast.error("Please select at least one platform.");
+      return;
+    }
+
+    if (!scheduledDate || !scheduledTime) {
+      toast.error("Please select a valid date and time.");
+      return;
+    }
+
+    if (selectedPlatforms.includes("instagram") && !activeScheduler.mediaUrl) {
+      toast.error("Instagram posts require media.");
+      return;
+    }
+
+    const scheduledFor = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
+    const formData = new FormData();
+    formData.append("content", activeScheduler.content);
+    formData.append("scheduledFor", scheduledFor);
+    formData.append("platforms", JSON.stringify(selectedPlatforms));
+
+    if (activeScheduler.mediaUrl) {
+      formData.append("mediaUrl", activeScheduler.mediaUrl);
+      formData.append("mediaType", activeScheduler.mediaType || "image");
+    }
+
     setScheduling(true);
-    setTimeout(() => {
+    try {
+      await api.post("/api/posts", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast.success("Post scheduled successfully!");
+      setActiveScheduler(null);
+      setSelectedPlatforms([]);
+      setScheduledDate("");
+      setScheduledTime("");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to schedule post.");
+    } finally {
       setScheduling(false);
-    }, 2000);
+    }
   };
 
   useEffect(() => {
