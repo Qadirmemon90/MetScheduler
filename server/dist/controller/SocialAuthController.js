@@ -1,6 +1,48 @@
 import zernio from "../config/zernio.js";
 import { User } from "../models/user.js";
 import { Account } from "../models/Accounts.js";
+const SUPPORTED_OAUTH_PLATFORMS = new Set([
+    "facebook",
+    "instagram",
+    "linkedin",
+    "twitter",
+    "tiktok",
+    "youtube",
+    "threads",
+    "reddit",
+    "pinterest",
+    "bluesky",
+    "googlebusiness",
+    "telegram",
+    "snapchat",
+    "discord",
+    "whatsapp",
+]);
+const getClientOrigin = (req) => {
+    const headerOrigin = req.headers.origin;
+    if (typeof headerOrigin === "string" && headerOrigin.startsWith("http")) {
+        return headerOrigin;
+    }
+    return process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://127.0.0.1:5173";
+};
+const getProviderMessage = (error) => error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.data?.message ||
+    error?.data?.error ||
+    error?.error?.message ||
+    error?.error ||
+    error?.message ||
+    "Social account connection could not be started right now.";
+const isAdminSetupRequiredError = (message) => /payment method|connect more than 2 accounts|pass-through costs/i.test(message);
+const getPlatformLabel = (platform) => {
+    const labels = {
+        facebook: "Facebook",
+        instagram: "Instagram",
+        linkedin: "LinkedIn",
+        twitter: "Twitter / X",
+    };
+    return labels[platform] || platform.charAt(0).toUpperCase() + platform.slice(1);
+};
 //Helper to ensure user has a Zernio Profile
 const getOrCreateZernioProfile = async (user) => {
     try {
@@ -27,27 +69,46 @@ const getOrCreateZernioProfile = async (user) => {
 // GET /api/auth/:platform
 export const generateAuthUrl = async (req, res) => {
     try {
-        const { platform } = req.params;
+        const platform = String(req.params.platform || "").toLowerCase();
+        if (!SUPPORTED_OAUTH_PLATFORMS.has(platform)) {
+            res.status(400).json({ message: "This platform is not supported for OAuth connection." });
+            return;
+        }
+        if (!process.env.ZERNIO_API_KEY) {
+            res.status(503).json({
+                message: "Social connection is not configured yet. Please add the Zernio API key on the server.",
+            });
+            return;
+        }
         const profileId = await getOrCreateZernioProfile(req.user);
-        const origin = req.headers.origin;
-        const redirectUrl = `${origin}/accounts`;
+        const redirectUrl = `${getClientOrigin(req).replace(/\/$/, "")}/accounts`;
         const result = await zernio.connect.getConnectUrl({
             path: { platform: platform },
             query: {
                 profileId,
-                redirectUrl: redirectUrl,
+                redirect_url: redirectUrl,
             },
         });
         const data = result.data;
         console.log("getConnectUrl response:", JSON.stringify(data, null, 2));
-        const authUrl = data.authUrl;
+        const authUrl = data?.authUrl || data?.url;
         if (!authUrl) {
-            throw new Error(`Zernio reutrned no authUrl. Full response: ${JSON.stringify(data)}`);
+            console.error("Zernio returned no authUrl:", data || result);
+            throw new Error("Social account connection could not be started right now. Please try again in a moment.");
         }
         res.json({ url: authUrl });
     }
     catch (error) {
-        res.status(500).json({ message: error?.message || "Server error" });
+        const providerMessage = getProviderMessage(error);
+        console.error("generateAuthUrl Error:", error?.response?.data || error?.data || error?.message || error);
+        if (isAdminSetupRequiredError(providerMessage)) {
+            res.json({
+                requiresAdminSetup: true,
+                message: `Your plan allows ${getPlatformLabel(String(req.params.platform || ""))} connection, but admin-side social provider setup is required before OAuth can start. Please contact support on WhatsApp. No user payment method is required.`,
+            });
+            return;
+        }
+        res.status(502).json({ message: providerMessage });
     }
 };
 // Sync connected accounts from Zernio into MongoDB

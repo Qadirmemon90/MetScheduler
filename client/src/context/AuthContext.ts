@@ -32,6 +32,21 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children})=
     const [token, setToken] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
 
+    const clearSession = () => {
+        setUser(null)
+        setToken(null)
+        localStorage.removeItem("user")
+        localStorage.removeItem("token")
+        delete api.defaults.headers.common["Authorization"];
+    }
+
+    const handleUnauthorized = () => {
+        clearSession();
+        if(window.location.pathname !== "/login"){
+            window.location.replace("/login");
+        }
+    }
+
     useEffect(()=>{
         const storedUser = localStorage.getItem("user");
         const storedToken = localStorage.getItem("token");
@@ -47,9 +62,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children})=
                     localStorage.setItem("user", JSON.stringify(data));
                 })
                 .catch(() => {
-                    localStorage.removeItem("user");
-                    localStorage.removeItem("token");
-                    delete api.defaults.headers.common["Authorization"];
+                    clearSession();
                 })
                 .finally(() => setIsLoading(false));
             return;
@@ -57,6 +70,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children})=
 
         setIsLoading(false)
     },[])
+
+    useEffect(() => {
+        window.addEventListener("auth:unauthorized", handleUnauthorized);
+        return () => window.removeEventListener("auth:unauthorized", handleUnauthorized);
+    }, [])
 
     const login = (userData: User, newToken: string)=>{
         setUser(userData)
@@ -77,11 +95,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children})=
     }
 
     const logout = () =>{
-        setUser(null)
-        setToken(null)
-        localStorage.removeItem("user")
-        localStorage.removeItem("token")
-        delete api.defaults.headers.common["Authorization"];
+        clearSession();
     }
 
     return React.createElement(

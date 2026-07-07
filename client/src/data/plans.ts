@@ -32,7 +32,7 @@ export const defaultPricingPlans: PricingPlan[] = [
   {
     id: "pro",
     name: "Pro",
-    price: "$25",
+    price: "Vendor quote",
     period: "",
     description: "For growing brands that need more automation and faster support.",
     features: [
@@ -48,7 +48,7 @@ export const defaultPricingPlans: PricingPlan[] = [
   {
     id: "business",
     name: "Business",
-    price: "$50",
+    price: "Vendor quote",
     period: "",
     description: "For teams and agencies managing multiple brands at scale.",
     features: [
