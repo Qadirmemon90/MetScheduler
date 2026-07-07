@@ -27,6 +27,10 @@ const Accounts = () => {
         const {data} = await api.get("/api/accounts");
         setAccounts(data);
       } catch(error: any){
+        if(error?.response?.status === 401){
+          toast.error("Session expired. Please sign in again.");
+          return;
+        }
         toast.error(error?.response?.data?.message || error?.message || "Failed to fetch accounts");
       }
     }
@@ -56,8 +60,21 @@ const Accounts = () => {
     setConnecting(platformId);
     try{
       const {data} = await api.get(`/api/oauth/connect/${platformId}/url`);
-      window.location.href = data.url;
+      if(data?.url){
+        window.location.href = data.url;
+        return;
+      }
+      toast(data?.message || `Connection setup is not available for ${platformId} right now.`, {
+        duration: 6000,
+      });
+      setConnecting(null);
     }catch(error: any){
+      if(error?.response?.status === 401){
+        setShowPlatformPicker(false);
+        toast.error("Session expired. Please sign in again.");
+        setConnecting(null);
+        return;
+      }
       toast.error(error?.response?.data?.message || error?.message || `Failed to connect ${platformId}`);
       setConnecting(null);
     }
@@ -69,6 +86,10 @@ const Accounts = () => {
       toast.success("Account disconnected successfully!");
       await fetchAccounts();
     } catch(error: any){
+      if(error?.response?.status === 401){
+        toast.error("Session expired. Please sign in again.");
+        return;
+      }
       toast.error(error?.response?.data?.message || error?.message || "Failed to disconnect account");
     }
   }
