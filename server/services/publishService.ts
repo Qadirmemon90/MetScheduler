@@ -11,6 +11,18 @@ export const SOCIAL_PLATFORMS = [
   "facebook_page",
   "linkedin_page",
   "instagram_business",
+  "tiktok",
+  "youtube",
+  "threads",
+  "pinterest",
+  "reddit",
+  "bluesky",
+  "googlebusiness",
+  "telegram",
+  "snapchat",
+  "discord",
+  "whatsapp",
+  "x",
 ] as const;
 
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
@@ -18,10 +30,11 @@ export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 export const isSocialPlatform = (platform: string): platform is SocialPlatform =>
   (SOCIAL_PLATFORMS as readonly string[]).includes(platform);
 
-const toZernioPlatform = (platform: SocialPlatform) => {
+const toZernioPlatform = (platform: string) => {
   if (platform === "facebook_page") return "facebook";
   if (platform === "linkedin_page") return "linkedin";
   if (platform === "instagram_business") return "instagram";
+  if (platform === "x") return "twitter";
   return platform;
 };
 

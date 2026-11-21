@@ -23,7 +23,15 @@ const getClientOrigin = (req) => {
     if (typeof headerOrigin === "string" && headerOrigin.startsWith("http")) {
         return headerOrigin;
     }
-    return process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://127.0.0.1:5173";
+    const referer = req.headers.referer;
+    if (typeof referer === "string" && referer.startsWith("http")) {
+        try {
+            const url = new URL(referer);
+            return url.origin;
+        }
+        catch { }
+    }
+    return process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://localhost:5173";
 };
 const getProviderMessage = (error) => error?.response?.data?.message ||
     error?.response?.data?.error ||
@@ -121,12 +129,30 @@ export const syncAccounts = async (req, res) => {
         });
         const data = result.data;
         const zernioAccounts = data?.accounts || data?.data || (Array.isArray(data) ? data : []);
-        const supportedPlatforms = [
-            "linkedin",
-            "facebook",
-            "instagram",
-            "twitter",
-        ];
+        const normalizePlatform = (raw) => {
+            const p = (raw || "").toLowerCase().trim();
+            if (p === "x" || p.includes("twitter"))
+                return "twitter";
+            if (p.includes("linkedin"))
+                return "linkedin";
+            if (p.includes("facebook"))
+                return "facebook";
+            if (p.includes("instagram"))
+                return "instagram";
+            if (p.includes("threads"))
+                return "threads";
+            if (p.includes("tiktok"))
+                return "tiktok";
+            if (p.includes("youtube"))
+                return "youtube";
+            if (p.includes("pinterest"))
+                return "pinterest";
+            if (p.includes("reddit"))
+                return "reddit";
+            if (p.includes("bluesky"))
+                return "bluesky";
+            return p;
+        };
         const syncedAccounts = [];
         for (const zAccount of zernioAccounts) {
             const zid = zAccount._id || zAccount.id;
@@ -134,18 +160,12 @@ export const syncAccounts = async (req, res) => {
                 console.warn("Skipping account with no ID:", zAccount);
                 continue;
             }
-            const rawPlatform = (zAccount.platform ||
-                zAccount.type ||
-                "").toLowerCase();
-            const normalizedPlatform = supportedPlatforms.find((p) => rawPlatform.includes(p));
-            if (!normalizedPlatform) {
-                console.log(`Skipping unsupported platform: "${rawPlatform}"`);
-                continue;
-            }
+            const rawPlatform = zAccount.platform || zAccount.type || "";
+            const normalizedPlatform = normalizePlatform(rawPlatform);
             const account = await Account.findOneAndUpdate({ user: req.user._id, zernioAccountId: zid }, {
                 user: req.user._id,
                 platform: normalizedPlatform,
-                handle: zAccount.username || zAccount.name || zAccount.handle || "Unknown",
+                handle: zAccount.username || zAccount.name || zAccount.handle || "Social Account",
                 zernioAccountId: zid,
                 status: "connected",
                 avatarUrl: zAccount.avatarUrl ||
@@ -164,6 +184,7 @@ export const syncAccounts = async (req, res) => {
         res.json(syncedAccounts);
     }
     catch (error) {
-        res.status(500).json({ message: error?.message || "Server error" });
+        console.error("syncAccounts Error:", error?.response?.data || error?.message || error);
+        res.status(500).json({ message: error?.response?.data?.message || error?.message || "Server error" });
     }
 };

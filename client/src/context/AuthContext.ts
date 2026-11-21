@@ -10,7 +10,9 @@ export interface User {
     email: string;
     role?: "user" | "admin";
     plan?: "free" | "pro" | "business";
-    billingStatus?: "free" | "contact_requested" | "active";
+    billingStatus?: "free" | "contact_requested" | "payment_pending" | "active";
+    status?: "active" | "suspended";
+    mcpApiKey?: string;
 }
 
 interface AuthContextType {

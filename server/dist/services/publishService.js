@@ -10,6 +10,18 @@ export const SOCIAL_PLATFORMS = [
     "facebook_page",
     "linkedin_page",
     "instagram_business",
+    "tiktok",
+    "youtube",
+    "threads",
+    "pinterest",
+    "reddit",
+    "bluesky",
+    "googlebusiness",
+    "telegram",
+    "snapchat",
+    "discord",
+    "whatsapp",
+    "x",
 ];
 export const isSocialPlatform = (platform) => SOCIAL_PLATFORMS.includes(platform);
 const toZernioPlatform = (platform) => {
@@ -19,6 +31,8 @@ const toZernioPlatform = (platform) => {
         return "linkedin";
     if (platform === "instagram_business")
         return "instagram";
+    if (platform === "x")
+        return "twitter";
     return platform;
 };
 const getErrorPayload = (err) => err?.response?.data ||

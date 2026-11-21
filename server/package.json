@@ -6,6 +6,9 @@
   "scripts": {
     "start": "tsx server.ts",
     "server": "nodemon --exec tsx server.ts",
+    "mcp": "tsx mcpServer.ts",
+    "seed:admin": "tsx seedAdmin.ts",
+    "test": "tsx testAll.ts",
     "build": "tsc"
   },
   "keywords": [],
@@ -21,6 +24,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.7.3",
     "multer": "^2.2.0",

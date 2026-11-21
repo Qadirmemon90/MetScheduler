@@ -3,15 +3,42 @@ import api from "../api/axios";
 import { defaultPricingPlans } from "../data/plans";
 import type { PricingPlan } from "../data/plans";
 
-type PublicSiteSettings = {
+export type PaymentMethodDetails = {
+  enabled: boolean;
+  accountTitle: string;
+  accountNumber: string;
+  instructions: string;
+  qrCodeUrl?: string;
+  bankName?: string;
+  iban?: string;
+  branchCode?: string;
+};
+
+export type PublicSiteSettings = {
+  siteName?: string;
+  tagline?: string;
   googleAnalyticsEnabled: boolean;
   googleAnalyticsMeasurementId: string;
+  maintenanceMode?: boolean;
   vendorName: string;
   vendorEmail: string;
   vendorPhone: string;
   vendorWhatsapp: string;
   supportEmail: string;
   plans: PricingPlan[];
+  paymentMethods?: {
+    easypaisa?: PaymentMethodDetails;
+    jazzcash?: PaymentMethodDetails;
+    bankTransfer?: PaymentMethodDetails;
+    sadapay?: PaymentMethodDetails;
+    nayapay?: PaymentMethodDetails;
+  };
+  policies?: {
+    privacyPolicy?: string;
+    termsOfService?: string;
+    refundPolicy?: string;
+    cookiePolicy?: string;
+  };
 };
 
 type SiteSettingsContextType = {
@@ -21,13 +48,16 @@ type SiteSettingsContextType = {
 };
 
 const defaultSettings: PublicSiteSettings = {
+  siteName: "MetScheduler",
+  tagline: "AI-Powered Social Media Scheduler & Content Engine",
   googleAnalyticsEnabled: false,
   googleAnalyticsMeasurementId: "",
-  vendorName: "Vendor Team",
-  vendorEmail: "",
-  vendorPhone: "",
-  vendorWhatsapp: "",
-  supportEmail: "",
+  maintenanceMode: false,
+  vendorName: "MetScheduler Team",
+  vendorEmail: "support@metscheduler.com",
+  vendorPhone: "+92 300 1234567",
+  vendorWhatsapp: "+92 300 1234567",
+  supportEmail: "support@metscheduler.com",
   plans: defaultPricingPlans,
 };
 

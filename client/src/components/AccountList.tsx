@@ -41,8 +41,14 @@ const AccountList = ({ accounts, onDisconnect }: AccountListProps) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {accounts.map((account, index) => {
-        const meta = PLATFORMS.find((p) => p.id === account.platform);
-        if (!meta) return null;
+        const meta =
+          PLATFORMS.find((p) => p.id === account.platform) ||
+          PLATFORMS.find((p) => account.platform?.startsWith(p.id)) ||
+          {
+            id: account.platform,
+            name: account.platform ? account.platform.charAt(0).toUpperCase() + account.platform.slice(1) : "Social Account",
+            icon: PLATFORMS[0].icon,
+          };
 
         return(
             <div key={index} className="group bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 hover:border-slate-300 

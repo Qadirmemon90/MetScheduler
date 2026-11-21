@@ -2,7 +2,7 @@ import axios from "axios";
 
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"
+    baseURL: import.meta.env.VITE_API_BASE_URL || ""
 })
 
 api.interceptors.request.use((config) => {
@@ -16,6 +16,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
     (response) => response,
     (error) => {
+        if (!error.response && error.message === "Network Error") {
+            console.error("Backend server connection failed. Ensure the server is running on http://localhost:3000.");
+        }
         if(error?.response?.status === 401){
             localStorage.removeItem("user");
             localStorage.removeItem("token");

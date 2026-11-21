@@ -1,4 +1,5 @@
 import cron from "node-cron";
+import mongoose from "mongoose";
 import { publishDuePosts } from "./publishService.js";
 
 let schedulerStarted = false;
@@ -9,6 +10,9 @@ export const initScheduler = () => {
 
   cron.schedule("* * * * *", async () => {
     try {
+      if (mongoose.connection.readyState !== 1) {
+        return;
+      }
       const now = new Date();
       const summary = await publishDuePosts(now);
       if (summary.evaluated > 0) {

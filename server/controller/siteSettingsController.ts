@@ -1,5 +1,11 @@
-import { Response } from "express";
-import { defaultPlans, SiteSettings } from "../models/SiteSettings.js";
+import { Request, Response } from "express";
+import {
+  defaultPlans,
+  defaultPaymentMethods,
+  defaultPolicies,
+  SiteSettings,
+} from "../models/SiteSettings.js";
+import { delCachePattern } from "../config/redis.js";
 
 const allowedPlanIds = ["free", "pro", "business"];
 
@@ -19,10 +25,12 @@ const plainPlan = (plan: any) => {
 };
 
 const ensureAllPlans = (plans: any[] = []) => {
-  const planMap = new Map(plans.map((plan) => {
-    const normalized = plainPlan(plan);
-    return [normalized.id, normalized];
-  }));
+  const planMap = new Map(
+    plans.map((plan) => {
+      const normalized = plainPlan(plan);
+      return [normalized.id, normalized];
+    }),
+  );
   return defaultPlans.map((fallback) => ({
     ...fallback,
     ...(planMap.get(fallback.id) || {}),
@@ -30,15 +38,35 @@ const ensureAllPlans = (plans: any[] = []) => {
   }));
 };
 
-const getOrCreateSettings = async () => {
+export const getOrCreateSettings = async () => {
   let settings = await SiteSettings.findOne();
 
   if (!settings) {
-    settings = await SiteSettings.create({ plans: defaultPlans });
+    settings = await SiteSettings.create({
+      plans: defaultPlans,
+      paymentMethods: defaultPaymentMethods,
+      policies: defaultPolicies,
+    });
   }
+
+  let needsSave = false;
 
   if (!settings.plans?.length || settings.plans.length < defaultPlans.length) {
     settings.plans = ensureAllPlans(settings.plans as any) as any;
+    needsSave = true;
+  }
+
+  if (!settings.paymentMethods || Object.keys(settings.paymentMethods).length === 0) {
+    settings.paymentMethods = defaultPaymentMethods;
+    needsSave = true;
+  }
+
+  if (!settings.policies || Object.keys(settings.policies).length === 0) {
+    settings.policies = defaultPolicies;
+    needsSave = true;
+  }
+
+  if (needsSave) {
     await settings.save();
   }
 
@@ -46,14 +74,19 @@ const getOrCreateSettings = async () => {
 };
 
 const publicSettingsPayload = (settings: any) => ({
-  googleAnalyticsEnabled: settings.googleAnalyticsEnabled,
-  googleAnalyticsMeasurementId: settings.googleAnalyticsMeasurementId,
+  siteName: settings.siteName || "MetScheduler",
+  tagline: settings.tagline || "AI-Powered Social Media Scheduler & Content Engine",
+  googleAnalyticsEnabled: Boolean(settings.googleAnalyticsEnabled),
+  googleAnalyticsMeasurementId: settings.googleAnalyticsMeasurementId || "",
+  maintenanceMode: Boolean(settings.maintenanceMode),
   vendorName: settings.vendorName,
   vendorEmail: settings.vendorEmail,
   vendorPhone: settings.vendorPhone,
   vendorWhatsapp: settings.vendorWhatsapp,
   supportEmail: settings.supportEmail,
   plans: ensureAllPlans(settings.plans).filter((plan) => plan.enabled),
+  paymentMethods: settings.paymentMethods || defaultPaymentMethods,
+  policies: settings.policies || defaultPolicies,
 });
 
 const sanitizePlans = (plans: any[] = []) =>
@@ -76,7 +109,7 @@ const sanitizePlans = (plans: any[] = []) =>
     }));
 
 export const getPublicSettings = async (
-  _req: any,
+  _req: Request,
   res: Response,
 ): Promise<void> => {
   try {
@@ -87,8 +120,20 @@ export const getPublicSettings = async (
   }
 };
 
+export const getPublicPolicies = async (
+  _req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const settings = await getOrCreateSettings();
+    res.json(settings.policies || defaultPolicies);
+  } catch (error: any) {
+    res.status(500).json({ message: error?.message || "Server error" });
+  }
+};
+
 export const getAdminSettings = async (
-  _req: any,
+  _req: Request,
   res: Response,
 ): Promise<void> => {
   try {
@@ -100,14 +145,17 @@ export const getAdminSettings = async (
 };
 
 export const updateAdminSettings = async (
-  req: any,
+  req: Request,
   res: Response,
 ): Promise<void> => {
   try {
     const settings = await getOrCreateSettings();
     const {
+      siteName,
+      tagline,
       googleAnalyticsEnabled,
       googleAnalyticsMeasurementId,
+      maintenanceMode,
       vendorName,
       vendorEmail,
       vendorPhone,
@@ -115,21 +163,49 @@ export const updateAdminSettings = async (
       supportEmail,
       publicApiNote,
       plans,
+      paymentMethods,
+      policies,
     } = req.body;
 
-    settings.googleAnalyticsEnabled = Boolean(googleAnalyticsEnabled);
-    settings.googleAnalyticsMeasurementId = String(
-      googleAnalyticsMeasurementId || "",
-    ).trim();
-    settings.vendorName = String(vendorName || "").trim();
-    settings.vendorEmail = String(vendorEmail || "").trim();
-    settings.vendorPhone = String(vendorPhone || "").trim();
-    settings.vendorWhatsapp = String(vendorWhatsapp || "").trim();
-    settings.supportEmail = String(supportEmail || "").trim();
-    settings.publicApiNote = String(publicApiNote || "").trim();
-    settings.plans = sanitizePlans(plans) as any;
+    if (siteName !== undefined) settings.siteName = String(siteName).trim();
+    if (tagline !== undefined) settings.tagline = String(tagline).trim();
+    if (maintenanceMode !== undefined) settings.maintenanceMode = Boolean(maintenanceMode);
+    if (googleAnalyticsEnabled !== undefined)
+      settings.googleAnalyticsEnabled = Boolean(googleAnalyticsEnabled);
+    if (googleAnalyticsMeasurementId !== undefined)
+      settings.googleAnalyticsMeasurementId = String(googleAnalyticsMeasurementId).trim();
+    if (vendorName !== undefined) settings.vendorName = String(vendorName).trim();
+    if (vendorEmail !== undefined) settings.vendorEmail = String(vendorEmail).trim();
+    if (vendorPhone !== undefined) settings.vendorPhone = String(vendorPhone).trim();
+    if (vendorWhatsapp !== undefined) settings.vendorWhatsapp = String(vendorWhatsapp).trim();
+    if (supportEmail !== undefined) settings.supportEmail = String(supportEmail).trim();
+    if (publicApiNote !== undefined) settings.publicApiNote = String(publicApiNote).trim();
+
+    if (plans) {
+      settings.plans = sanitizePlans(plans) as any;
+    }
+
+    if (paymentMethods) {
+      settings.paymentMethods = {
+        ...(settings.paymentMethods || defaultPaymentMethods),
+        ...paymentMethods,
+      };
+      settings.markModified("paymentMethods");
+    }
+
+    if (policies) {
+      settings.policies = {
+        ...(settings.policies || defaultPolicies),
+        ...policies,
+      };
+      settings.markModified("policies");
+    }
 
     await settings.save();
+
+    // Invalidate Redis cache
+    await delCachePattern("cache:*");
+
     res.json(settings);
   } catch (error: any) {
     res.status(500).json({ message: error?.message || "Server error" });

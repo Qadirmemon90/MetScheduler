@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react"
 import {   PLATFORMS } from "../assets/assets"
-import { PlusIcon } from "lucide-react"
+import { PlusIcon, RefreshCwIcon } from "lucide-react"
 import AccountList from "../components/AccountList"
 import PlatformPickerModal from "../components/PlatformPickerModal"
 import toast from "react-hot-toast"
@@ -13,6 +13,7 @@ const Accounts = () => {
 
   const [accounts, setAccounts] = useState<any[]>([])
   const [connecting, setConnecting] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
   const [showPlatformPicker, setShowPlatformPicker] = useState(false)
 
   const fetchAccounts = async (isSync = false, platform?: string | null, successMsg?:
@@ -94,6 +95,12 @@ const Accounts = () => {
     }
   }
 
+  const handleManualSync = async () => {
+    setSyncing(true);
+    await fetchAccounts(true, null, "Accounts refreshed successfully!");
+    setSyncing(false);
+  };
+
   const connectedIds = accounts.map((a)=>a.platform)
 
   return (
@@ -105,10 +112,21 @@ const Accounts = () => {
           <h2 className="text-xl text-slate-900">Connected Accounts</h2>
           <p className="text-slate-500 text-sm mt-0.5">{accounts.length} of {PLATFORMS.length} platforms connected</p>
         </div>
-        <button onClick={()=> setShowPlatformPicker(true)} className="flex items-center gap-2 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white
-        rounded-full font-medium transition-all w-full sm:w-auto justify-center">
-          <PlusIcon className="size-4"/> Connect Account
-        </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={handleManualSync}
+            disabled={syncing}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700
+            rounded-full font-medium transition-all justify-center disabled:opacity-60"
+            title="Sync accounts with providers"
+          >
+            <RefreshCwIcon className={`size-4 ${syncing ? "animate-spin" : ""}`} /> Sync
+          </button>
+          <button onClick={()=> setShowPlatformPicker(true)} className="flex items-center gap-2 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white
+          rounded-full font-medium transition-all w-full sm:w-auto justify-center">
+            <PlusIcon className="size-4"/> Connect Account
+          </button>
+        </div>
       </div>
 
       {/* Platform picker modal */}
